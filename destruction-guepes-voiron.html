@@ -169,6 +169,7 @@ footer a:hover{color:var(--blanc);}
         <div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:#888;font-weight:600;">Nom *</label><input type="text" placeholder="Votre nom" style="border:2px solid #ddd;border-radius:6px;padding:10px 13px;font-family:'Open Sans',sans-serif;font-size:0.92rem;outline:none;background:#fff;"></div>
         <div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:#888;font-weight:600;">Téléphone *</label><input type="tel" placeholder="06 xx xx xx xx" style="border:2px solid #ddd;border-radius:6px;padding:10px 13px;font-family:'Open Sans',sans-serif;font-size:0.92rem;outline:none;background:#fff;"></div>
       </div>
+      <div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:#888;font-weight:600;">Email <span style="color:#aaa;font-weight:400;">(optionnel)</span></label><input type="email" id="email" name="email" placeholder="votre@email.fr" style="border:2px solid #ddd;border-radius:6px;padding:10px 13px;font-family:'Open Sans',sans-serif;font-size:0.92rem;outline:none;background:#fff;"></div>
       <div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:#888;font-weight:600;">Commune</label><input type="text" value="Voiron" style="border:2px solid var(--vert);border-radius:6px;padding:10px 13px;font-family:'Open Sans',sans-serif;font-size:0.92rem;outline:none;background:#fff;"></div>
       <div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:#888;font-weight:600;">Type d'intervention</label><select style="border:2px solid #ddd;border-radius:6px;padding:10px 13px;font-family:'Open Sans',sans-serif;font-size:0.92rem;outline:none;background:#fff;"><option>Nid de guêpes</option><option>Nid de frelons</option><option>Frelon asiatique</option><option>Rongeurs</option><option>Moustiques</option></select></div>
       <div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:#888;font-weight:600;">Description</label><textarea rows="3" placeholder="Emplacement, taille, urgence..." style="border:2px solid #ddd;border-radius:6px;padding:10px 13px;font-family:'Open Sans',sans-serif;font-size:0.92rem;outline:none;resize:vertical;background:#fff;"></textarea></div>
@@ -186,6 +187,8 @@ var s="voiron",tags=communes[s]||[],c=document.getElementById("cp-"+s);
 if(c)tags.forEach(function(t){var a=document.createElement("a");a.href="/destruction-guepes-"+t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,"-").replace(/[éèê]/g,"e").replace(/[^a-z0-9-]/g,"");a.className="cp";a.textContent=t;c.appendChild(a);});
 </script>
 
+
+
 <script>
 const SUPA_URL = 'https://lnisubupgzkprhrctctr.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuaXN1YnVwZ3prcHJocmN0Y3RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MjAwNjUsImV4cCI6MjA4ODk5NjA2NX0.z2J1-Us7a0kAGzqZhDQflH2s86Z0h95CE4mXhbVcF0w';
@@ -193,22 +196,46 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 async function envoyerDemande(e) {
   e.preventDefault();
   const form = e.target;
-  const btn = form.querySelector('button[type="submit"], button.btn-submit, button[onclick]');
-  
-  // Récupérer les champs
-  const data = {
-    nom: form.querySelector('input[type="text"]')?.value || '',
-    telephone: form.querySelector('input[type="tel"]')?.value || '',
-    commune: form.querySelector('input[placeholder*="commune"], input[placeholder*="Commune"]')?.value || '',
-    service: form.querySelector('select')?.value || '',
-    description: form.querySelector('textarea')?.value || '',
-    source_page: window.location.pathname
-  };
 
-  if (!data.nom || !data.telephone) {
+  // Récupérer tous les inputs texte et tel dans l'ordre
+  const inputs = form.querySelectorAll('input[type="text"], input[type="tel"]');
+  const textarea = form.querySelector('textarea');
+  const select = form.querySelector('select');
+  const btn = form.querySelector('button');
+
+  // Chercher nom et téléphone par placeholder ou par ordre
+  let nom = '', telephone = '', commune = '';
+  inputs.forEach(function(inp) {
+    const ph = (inp.placeholder || '').toLowerCase();
+    const id = (inp.id || '').toLowerCase();
+    if (ph.includes('nom') || id.includes('nom')) {
+      nom = inp.value;
+    } else if (ph.includes('tel') || ph.includes('06') || id.includes('tel') || inp.type === 'tel') {
+      telephone = inp.value;
+    } else if (ph.includes('commune') || id.includes('commune')) {
+      commune = inp.value;
+    }
+  });
+
+  // Fallback : prendre par ordre si pas trouvé par placeholder
+  if (!nom && inputs.length > 0) nom = inputs[0].value;
+  if (!telephone && inputs.length > 1) telephone = inputs[1].value;
+  if (!commune && inputs.length > 2) commune = inputs[2].value;
+
+  if (!nom || !telephone) {
     alert('Merci de renseigner votre nom et téléphone.');
     return;
   }
+
+  const data = {
+    nom: nom,
+    telephone: telephone,
+    commune: commune,
+    email: form.querySelector('input[type="email"]')?.value || '',
+    service: select ? select.value : '',
+    description: textarea ? textarea.value : '',
+    source_page: window.location.pathname
+  };
 
   try {
     const resp = await fetch(SUPA_URL + '/rest/v1/demandes_contact', {
@@ -230,23 +257,24 @@ async function envoyerDemande(e) {
       }
       form.reset();
     } else {
-      throw new Error('Erreur serveur: ' + resp.status);
+      const err = await resp.text();
+      console.error('Supabase error:', err);
+      alert('Erreur lors de l\'envoi. Appelez-nous au 06 84 73 52 42.');
     }
   } catch(err) {
     console.error(err);
-    alert('Une erreur est survenue. Appelez-nous directement au 06 84 73 52 42.');
+    alert('Erreur réseau. Appelez-nous au 06 84 73 52 42.');
   }
 }
 
-// Attacher à tous les formulaires de la page
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('form').forEach(function(form) {
-    form.addEventListener('submit', envoyerDemande);
-    // Supprimer les anciens onclick sur les boutons
+    // Supprimer anciens handlers
     form.querySelectorAll('button').forEach(function(btn) {
       btn.removeAttribute('onclick');
       btn.setAttribute('type', 'submit');
     });
+    form.addEventListener('submit', envoyerDemande);
   });
 });
 </script>
