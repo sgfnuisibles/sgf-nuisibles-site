@@ -81,6 +81,18 @@ footer a{color:#888;text-decoration:none;}
 @media(max-width:900px){.content-grid{grid-template-columns:1fr;}.sidebar{order:-1;}}
 @media(max-width:768px){.topbar-infos{display:none;}.nav-inner{display:none;flex-direction:column;padding:8px 0;}.nav-inner.open{display:flex;}.hamburger{display:flex;}section{padding:40px 5%;}}
 </style>
+
+<!-- OneSignal Push Notifications -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "c92298e7-8f64-487b-8e03-4d7b284c7f50",
+    });
+  });
+</script>
+
 </head>
 <body>
 <div class="topbar">
@@ -211,6 +223,8 @@ footer a{color:#888;text-decoration:none;}
 
 
 
+
+
 <script>
 const SUPA_URL = 'https://lnisubupgzkprhrctctr.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuaXN1YnVwZ3prcHJocmN0Y3RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MjAwNjUsImV4cCI6MjA4ODk5NjA2NX0.z2J1-Us7a0kAGzqZhDQflH2s86Z0h95CE4mXhbVcF0w';
@@ -218,46 +232,22 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 async function envoyerDemande(e) {
   e.preventDefault();
   const form = e.target;
+  const btn = form.querySelector('button[type="submit"], button.btn-submit');
 
-  // Récupérer tous les inputs texte et tel dans l'ordre
-  const inputs = form.querySelectorAll('input[type="text"], input[type="tel"]');
-  const textarea = form.querySelector('textarea');
-  const select = form.querySelector('select');
-  const btn = form.querySelector('button');
-
-  // Chercher nom et téléphone par placeholder ou par ordre
-  let nom = '', telephone = '', commune = '';
-  inputs.forEach(function(inp) {
-    const ph = (inp.placeholder || '').toLowerCase();
-    const id = (inp.id || '').toLowerCase();
-    if (ph.includes('nom') || id.includes('nom')) {
-      nom = inp.value;
-    } else if (ph.includes('tel') || ph.includes('06') || id.includes('tel') || inp.type === 'tel') {
-      telephone = inp.value;
-    } else if (ph.includes('commune') || id.includes('commune')) {
-      commune = inp.value;
-    }
-  });
-
-  // Fallback : prendre par ordre si pas trouvé par placeholder
-  if (!nom && inputs.length > 0) nom = inputs[0].value;
-  if (!telephone && inputs.length > 1) telephone = inputs[1].value;
-  if (!commune && inputs.length > 2) commune = inputs[2].value;
+  // Récupérer les champs par ID en priorité, sinon par ordre
+  const nom = (form.querySelector('#nom') || form.querySelectorAll('input[type="text"]')[0])?.value || '';
+  const telephone = (form.querySelector('#tel, input[type="tel"]'))?.value || '';
+  const commune = (form.querySelector('#commune') || form.querySelectorAll('input[type="text"]')[1] || form.querySelectorAll('input[type="text"]')[2])?.value || '';
+  const email = form.querySelector('#email, input[type="email"]')?.value || '';
+  const service = form.querySelector('select')?.value || '';
+  const description = (form.querySelector('#message') || form.querySelector('textarea'))?.value || '';
 
   if (!nom || !telephone) {
     alert('Merci de renseigner votre nom et téléphone.');
     return;
   }
 
-  const data = {
-    nom: nom,
-    telephone: telephone,
-    commune: commune,
-    email: form.querySelector('input[type="email"]')?.value || '',
-    service: select ? select.value : '',
-    description: textarea ? textarea.value : '',
-    source_page: window.location.pathname
-  };
+  if (btn) { btn.textContent = 'Envoi en cours...'; btn.disabled = true; }
 
   try {
     const resp = await fetch(SUPA_URL + '/rest/v1/demandes_contact', {
@@ -268,35 +258,38 @@ async function envoyerDemande(e) {
         'Authorization': 'Bearer ' + SUPA_KEY,
         'Prefer': 'return=minimal'
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify({ nom, telephone, commune, email, service, description, source_page: window.location.pathname })
     });
 
     if (resp.ok || resp.status === 201) {
-      if (btn) {
-        btn.textContent = '✓ Demande envoyée !';
-        btn.style.background = '#1A5C1A';
-        btn.disabled = true;
-      }
+      if (btn) { btn.textContent = '✓ Demande envoyée !'; btn.style.background = '#1A5C1A'; }
+      // Afficher message succès si présent
+      const success = document.getElementById('form-success');
+      if (success) success.style.display = 'block';
       form.reset();
     } else {
       const err = await resp.text();
-      console.error('Supabase error:', err);
+      console.error('Erreur Supabase:', resp.status, err);
+      if (btn) { btn.textContent = 'Envoyer ma demande →'; btn.disabled = false; }
       alert('Erreur lors de l\'envoi. Appelez-nous au 06 84 73 52 42.');
     }
   } catch(err) {
-    console.error(err);
+    console.error('Erreur réseau:', err);
+    if (btn) { btn.textContent = 'Envoyer ma demande →'; btn.disabled = false; }
     alert('Erreur réseau. Appelez-nous au 06 84 73 52 42.');
   }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('form').forEach(function(form) {
-    // Supprimer anciens handlers
+    // Remplacer onsubmit par addEventListener
+    form.removeAttribute('onsubmit');
+    form.addEventListener('submit', envoyerDemande);
+    // S'assurer que le bouton est de type submit
     form.querySelectorAll('button').forEach(function(btn) {
       btn.removeAttribute('onclick');
       btn.setAttribute('type', 'submit');
     });
-    form.addEventListener('submit', envoyerDemande);
   });
 });
 </script>

@@ -171,6 +171,18 @@ footer a:hover{color:var(--blanc);}
   section{padding:52px 5%;}
 }
 </style>
+
+<!-- OneSignal Push Notifications -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "c92298e7-8f64-487b-8e03-4d7b284c7f50",
+    });
+  });
+</script>
+
 </head>
 <body>
 
